@@ -150,7 +150,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 # Основная функция
 def main():
-    # Замените "YOUR_TOKEN" на токен вашего бота
     application = Application.builder().token("8087692828:AAE6EeN3-PqhJaQnuiZz4NGcn1BX9VkSy-Y").build()
 
     # ConversationHandler для настройки базовой валюты
