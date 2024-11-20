@@ -1,3 +1,5 @@
+import json
+import os
 import requests
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
@@ -11,6 +13,24 @@ from telegram.ext import (
 
 # Состояния для ConversationHandler
 WAITING_FOR_CURRENCY = 1
+
+# Файл для сохранения настроек
+SETTINGS_FILE = "user_settings.json"
+
+# Загрузка настроек из файла
+def load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r") as file:
+            return json.load(file)
+    return {}
+
+# Сохранение настроек в файл
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as file:
+        json.dump(settings, file)
+
+# Глобальная переменная для хранения настроек
+user_settings = load_settings()
 
 # Получение курса валют от Центробанка РФ
 def get_exchange_rate(base_currency: str, target_currency: str):
@@ -39,7 +59,6 @@ def get_exchange_rate(base_currency: str, target_currency: str):
 
     # Конвертация через рубль
     return rates[target_currency] / rates[base_currency]
-
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -74,10 +93,12 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 # Обработка ответа пользователя на /settings
 async def set_base_currency(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = str(update.effective_user.id)
     currency = update.message.text.upper()
     if len(currency) == 3 and currency.isalpha():
         # Сохраняем базовую валюту
-        context.user_data["base_currency"] = currency
+        user_settings[user_id] = {"base_currency": currency}
+        save_settings(user_settings)
         await update.message.reply_text(
             f"Базовая валюта установлена: {currency}. Теперь при конвертации она будет использоваться по умолчанию."
         )
@@ -92,8 +113,9 @@ async def set_base_currency(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text
     try:
+        user_id = str(update.effective_user.id)
         parts = text.split()
-        
+
         # Если формат "100 DEFAULT в EUR"
         if len(parts) == 4 and parts[2].lower() == "в":
             amount = float(parts[0])
@@ -103,7 +125,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Если формат "100 в EUR" (базовая валюта используется по умолчанию)
         elif len(parts) == 3 and parts[1].lower() == "в":
             amount = float(parts[0])
-            base_currency = context.user_data.get("base_currency", "RUB")
+            base_currency = user_settings.get(user_id, {}).get("base_currency", "RUB")
             target_currency = parts[2].upper()
 
         else:
